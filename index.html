@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>互動式 3D 慵懶拉拉熊玩偶 (Interactive 3D Rilakkuma Plush)</title>
+  <style>
+    :root {
+      --bg: #f8f5f0;
+      --panel: rgba(255, 252, 247, 0.84);
+      --panel-border: rgba(180, 145, 110, 0.24);
+      --fg: #3b2a1e;
+      --muted: #7c6552;
+      --accent: #c58248;
+      --accent-fg: #ffffff;
+      --chip-bg: rgba(255, 255, 255, 0.75);
+    }
+    html.dark {
+      --bg: #181514;
+      --panel: rgba(34, 29, 27, 0.84);
+      --panel-border: rgba(255, 220, 185, 0.14);
+      --fg: #f5ece4;
+      --muted: #b5a292;
+      --accent: #d99559;
+      --accent-fg: #1f1610;
+      --chip-bg: rgba(48, 41, 38, 0.80);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    #viewport {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: grab;
+    }
+    canvas:active { cursor: grabbing; }
+    .top-stack {
+      position: absolute;
+      top: calc(12px + env(safe-area-inset-top, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: calc(100vw - 20px);
+      max-width: 860px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud-top {
+      pointer-events: auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 22px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.08);
+    }
+    .hud-bottom {
+      position: absolute;
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 10px 16px;
+      padding: 9px 16px;
+      border-radius: 22px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 10px 32px rgba(0,0,0,0.08);
+      font-size: 12.5px;
+      color: var(--muted);
+      width: max-content;
+      max-width: calc(100vw - 20px);
+      z-index: 10;
+    }
+    .toast {
+      padding: 5px 13px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      text-align: center;
+      max-width: calc(100vw - 28px);
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid var(--panel-border);
+      background: var(--chip-bg);
+      color: var(--fg);
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+    @media (max-width: 520px) {
+      .divider { display: none; }
+      .btn { padding: 5px 10px; font-size: 12px; }
+      input[type="range"] { width: 72px; }
+    }
+    .btn:hover { filter: brightness(1.03); }
+    .btn:active { transform: scale(0.95); }
+    .btn.active {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+    }
+    .divider {
+      width: 1px;
+      height: 18px;
+      background: var(--panel-border);
+      margin: 0 2px;
+    }
+    label.slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    input[type="range"] {
+      width: 88px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .mono {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: var(--fg);
+    }
+    #fxLayer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    @keyframes floatUp {
+      0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+      20% { opacity: 1; transform: translate(-50%, -12px) scale(1.1); }
+      100% { opacity: 0; transform: translate(-50%, -54px) scale(0.9); }
+    }
+    .fx-pop {
+      position: absolute;
+      pointer-events: none;
+      animation: floatUp 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      font-size: 20px;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.18));
+    }
+  </style>
+</head>
+<body>
+  <div id="viewport">
+    <canvas id="glCanvas"></canvas>
+    <div id="fxLayer"></div>
+
+    <div class="top-stack">
+      <div class="hud-top">
+        <button data-pose="0" class="pose-btn btn active">經典側躺</button>
+        <button data-pose="1" class="pose-btn btn">仰躺午睡</button>
+        <button data-pose="2" class="pose-btn btn">乖乖坐姿</button>
+        <button data-pose="3" class="pose-btn btn">趴趴踢腿</button>
+        <div class="divider"></div>
+        <button id="exprBtn" class="btn">表情：<span id="exprLabel">慵懶原版</span></button>
+        <button id="modeBtn" class="btn">🔄 旋轉 + 點擊戳戳</button>
+        <button id="matBtn" class="btn">☁️ 軟墊</button>
+        <button id="themeBtn" class="btn">🌙 深色棚拍</button>
+        <button id="resetBtn" class="btn">重置視角</button>
+      </div>
+
+      <div id="partToast" class="toast">
+        單指拖曳 360° 旋轉 · 點擊玩偶戳戳肚肚與鼻子 · 雙指／滾輪縮放
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <label class="slider-wrap">
+        <span>軟Q彈性</span>
+        <input id="squishSlider" type="range" min="40" max="180" value="110" />
+      </label>
+      <label class="slider-wrap">
+        <span>絨毛光澤</span>
+        <input id="fuzzSlider" type="range" min="20" max="160" value="100" />
+      </label>
+      <span id="statusReadout" class="mono">視角 0° · 經典側躺</span>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    const canvas = document.getElementById('glCanvas');
+    const viewport = document.getElementById('viewport');
+    const fxLayer = document.getElementById('fxLayer');
+    const partToast = document.getElementById('partToast');
+    const statusReadout = document.getElementById('statusReadout');
+
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+    if (!gl) {
+      partToast.textContent = '您的瀏覽器不支援 WebGL 3D 渲染';
+      return;
+    }
+
+    const v3 = {
+      add: (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]],
+      sub: (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]],
+      scale: (a, s) => [a[0]*s, a[1]*s, a[2]*s],
+      dot: (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2],
+      cross: (a, b) => [
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]
+      ],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      norm: (a) => {
+        const l = Math.hypot(a[0], a[1], a[2]) || 1;
+        return [a[0]/l, a[1]/l, a[2]/l];
+      },
+      lerp: (a, b, t) => [
+        a[0] + (b[0]-a[0])*t,
+        a[1] + (b[1]-a[1])*t,
+        a[2] + (b[2]-a[2])*t
+      ]
+    };
+
+    function makeBasisYZ(yDir, zHint) {
+      const Y = v3.norm(yDir);
+      let X = v3.cross(Y, zHint);
+      if (v3.len(X) < 1e-4) X = v3.cross(Y, [1, 0, 0]);
+      X = v3.norm(X);
+      const Z = v3.norm(v3.cross(X, Y));
+      return [...X, ...Y, ...Z];
+    }
+
+    function makeBasisXY(xHint, yDir) {
+      const Y = v3.norm(yDir);
+      const Z = v3.norm(v3.cross(xHint, Y));
+      const X = v3.norm(v3.cross(Y, Z));
+      return [...X, ...Y, ...Z];
+    }
+
+    function basisToQuat(m) {
+      const m00 = m[0], m01 = m[3], m02 = m[6];
+      const m10 = m[1], m11 = m[4], m12 = m[7];
+      const m20 = m[2], m21 = m[5], m22 = m[8];
+      const tr = m00 + m11 + m22;
+      let qw, qx, qy, qz;
+      if (tr > 0) {
+        const S = Math.sqrt(tr + 1.0) * 2;
+        qw = 0.25 * S;
+        qx = (m21 - m12) / S;
+        qy = (m02 - m20) / S;
+        qz = (m10 - m01) / S;
+      } else if ((m00 > m11) && (m00 > m22)) {
+        const S = Math.sqrt(1.0 + m00 - m11 - m22) * 2;
+        qw = (m21 - m12) / S;
+        qx = 0.25 * S;
+        qy = (m01 + m10) / S;
+        qz = (m02 + m20) / S;
+      } else if (m11 > m22) {
+        const S = Math.sqrt(1.0 + m11 - m00 - m22) * 2;
+        qw = (m02 - m20) / S;
+        qx = (m01 + m10) / S;
+        qy = 0.25 * S;
+        qz = (m12 + m21) / S;
+      } else {
+        const S = Math.sqrt(1.0 + m22 - m00 - m11) * 2;
+        qw = (m10 - m01) / S;
+        qx = (m02 + m20) / S;
+        qy = (m12 + m21) / S;
+        qz = 0.25 * S;
+      }
+      const l = Math.hypot(qx, qy, qz, qw) || 1;
+      return [qx/l, qy/l, qz/l, qw/l];
+    }
+
+    function quatSlerp(a, b, t) {
+      let bx = b[0], by = b[1], bz = b[2], bw = b[3];
+      let cosHalf = a[0]*bx + a[1]*by + a[2]*bz + a[3]*bw;
+      if (cosHalf < 0) {
+        bx = -bx; by = -by; bz = -bz; bw = -bw;
+        cosHalf = -cosHalf;
+      }
+      if (cosHalf >= 0.9995) {
+        const rx = a[0] + (bx - a[0])*t;
+        const ry = a[1] + (by - a[1])*t;
+        const rz = a[2] + (bz - a[2])*t;
+        const rw = a[3] + (bw - a[3])*t;
+        const l = Math.hypot(rx, ry, rz, rw) || 1;
+        return [rx/l, ry/l, rz/l, rw/l];
+      }
+      const halfAngle = Math.acos(Math.min(1, cosHalf));
+      const sinHalf = Math.sqrt(1.0 - cosHalf*cosHalf);
+      const ra = Math.sin((1 - t) * halfAngle) / sinHalf;
+      const rb = Math.sin(t * halfAngle) / sinHalf;
+      return [
+        a[0]*ra + bx*rb,
+        a[1]*ra + by*rb,
+        a[2]*ra + bz*rb,
+        a[3]*ra + bw*rb
+      ];
+    }
+
+    function quatToBasis(q) {
+      const x = q[0], y = q[1], z = q[2], w = q[3];
+      const x2 = x+x, y2 = y+y, z2 = z+z;
+      const xx = x*x2, xy = x*y2, xz = x*z2;
+      const yy = y*y2, yz = y*z2, zz = z*z2;
+      const wx = w*x2, wy = w*y2, wz = w*z2;
+      return [
+        1 - (yy + zz), xy + wz,       xz - wy,
+        xy - wz,       1 - (xx + zz), yz + wx,
+        xz + wy,       yz - wx,       1 - (xx + yy)
+      ];
+    }
+
+    function localToWorld(bonePos, boneBasis, localPt) {
+      return [
+        bonePos[0] + boneBasis[0]*localPt[0] + boneBasis[3]*localPt[1] + boneBasis[6]*localPt[2],
+        bonePos[1] + boneBasis[1]*localPt[0] + boneBasis[4]*localPt[1] + boneBasis[7]*localPt[2],
+        bonePos[2] + boneBasis[2]*localPt[0] + boneBasis[5]*localPt[1] + boneBasis[8]*localPt[2]
+      ];
+    }
+
+    function worldToLocal(bonePos, boneBasis, worldPt) {
+      const dx = worldPt[0] - bonePos[0];
+      const dy = worldPt[1] - bonePos[1];
+      const dz = worldPt[2] - bonePos[2];
+      return [
+        dx*boneBasis[0] + dy*boneBasis[1] + dz*boneBasis[2],
+        dx*boneBasis[3] + dy*boneBasis[4] + dz*boneBasis[5],
+        dx*boneBasis[6] + dy*boneBasis[7] + dz*boneBasis[8]
+      ];
+    }
+
+    const vertSrc = `
+      attribute vec2 aPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = aPos * 0.5 + 0.5;
+        gl_Position = vec4(aPos, 0.0, 1.0);
+      }
+    `;
+
+    const fragSrc = `
+      precision highp float;
+      varying vec2 vUv;
+
+      uniform vec2 uRes;
+      uniform float uTime;
+      uniform vec3 uCamPos;
+      uniform vec3 uCamFwd;
+      uniform vec3 uCamRight;
+      uniform vec3 uCamUp;
+
+      uniform float uIsLight;
+      uniform float uShowMat;
+      uniform float uFuzzGain;
+      uniform int uExpr;
+      uniform float uBlush;
+
+      uniform vec3 uPokePos;
+      uniform vec3 uPokeDir;
+      uniform float uPokeAmp;
+
+      uniform vec3 uHeadPos;   uniform mat3 uHeadMat;
+      uniform vec3 uEarLPos;   uniform mat3 uEarLMat;
+      uniform vec3 uEarRPos;   uniform mat3 uEarRMat;
+      uniform vec3 uTorsoPos;  uniform mat3 uTorsoMat;
+      uniform vec3 uArmLPos;   uniform mat3 uArmLMat;
+      uniform vec3 uArmRPos;   uniform mat3 uArmRMat;
+      uniform vec3 uLegLPos;   uniform mat3 uLegLMat;
+      uniform vec3 uLegRPos;   uniform mat3 uLegRMat;
+
+      float smin(float a, float b, float k) {
+        float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+        return mix(b, a, h) - k * h * (1.0 - h);
+      }
+
+      float sdEllipsoid(vec3 p, vec3 r) {
+        float k0 = length(p / r);
+        float k1 = length(p / (r * r));
+        return k0 * (k0 - 1.0) / max(k1, 1e-4);
+      }
+
+      float sdCapsuleY(vec3 p, float h, float r1, float r2) {
+        float y = clamp(p.y, -h, h);
+        float t = (y + h) / (2.0 * h);
+        float r = mix(r1, r2, t);
+        return length(p - vec3(0.0, y, 0.0)) - r;
+      }
+
+      float sdSeg2D(vec2 p, vec2 a, vec2 b) {
+        vec2 pa = p - a, ba = b - a;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        return length(pa - ba * h);
+      }
+
+      float sdMouthBezier(vec2 p, vec2 a, vec2 b, vec2 c) {
+        float d = 1e5;
+        vec2 prev = a;
+        for (int i = 1; i <= 10; i++) {
+          float t = float(i) * 0.1;
+          float it = 1.0 - t;
+          vec2 cur = it * it * a + 2.0 * it * t * b + t * t * c;
+          d = min(d, sdSeg2D(p, prev, cur));
+          prev = cur;
+        }
+        return d;
+      }
+
+      float snoutContour(vec2 sp) {
+        float yN = clamp(sp.y / 0.176, -1.2, 1.2);
+        float wScale = 1.0 - 0.07 * yN - 0.05 * yN * yN;
+        vec2 q = vec2(sp.x / (0.242 * wScale), sp.y / 0.175);
+        float r2 = dot(q, q);
+        float r4 = dot(q * q, q * q);
+        return mix(sqrt(max(r2, 1e-6)), pow(max(r4, 1e-8), 0.25), 0.20);
+      }
+
+      float hash31(vec3 p) {
+        p = fract(p * 0.1031);
+        p += dot(p, p.yzx + 33.33);
+        return fract((p.x + p.y) * p.z);
+      }
+
+      float noise3(vec3 x) {
+        vec3 i = floor(x);
+        vec3 f = fract(x);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(mix(hash31(i + vec3(0,0,0)), hash31(i + vec3(1,0,0)), f.x),
+              mix(hash31(i + vec3(0,1,0)), hash31(i + vec3(1,1,0)), f.x), f.y),
+          mix(mix(hash31(i + vec3(0,0,1)), hash31(i + vec3(1,0,1)), f.x),
+              mix(hash31(i + vec3(0,1,1)), hash31(i + vec3(1,1,1)), f.x), f.y),
+          f.z
+        );
+      }
+
+      vec3 warpPlush(vec3 p) {
+        if (abs(uPokeAmp) > 0.001) {
+          vec3 d = p - uPokePos;
+          float r2 = dot(d, d);
+          float w = exp(-r2 * 5.2);
+          vec3 radial = d - uPokeDir * dot(d, uPokeDir);
+          p -= uPokeDir * (0.17 * uPokeAmp * w);
+          p -= radial * (0.24 * uPokeAmp * w);
+        }
+        float floorCrush = 1.0 - smoothstep(-0.02, 0.11, p.y);
+        p.y += floorCrush * 0.018;
+        return p;
+      }
+
+      float dHeadPart(vec3 q) {
+        float yNorm = clamp(q.y / 0.60, -1.0, 1.0);
+        float cheekW = 1.04 - 0.11 * yNorm - 0.055 * yNorm * yNorm;
+        float zTap   = 1.00 - 0.06 * yNorm;
+        float dH = sdEllipsoid(q - vec3(0.0, 0.025, 0.0), vec3(0.755 * cheekW, 0.612, 0.558 * zTap));
+        float dJawFlat = -(q.y + 0.510 + 0.048 * (q.x * q.x));
+        dH = -smin(-dH, -dJawFlat, 0.13);
+
+        vec3 sq = q - vec3(0.0, -0.150, 0.492);
+        float sY = clamp(sq.y / 0.176, -1.0, 1.0);
+        float sW = 1.0 - 0.07 * sY - 0.05 * sY * sY;
+        float dSnout = sdEllipsoid(sq, vec3(0.244 * sW, 0.177, 0.144));
+        return smin(dH, dSnout, 0.015);
+      }
+
+      float dEarPart(vec3 e) {
+        float dOuter = sdEllipsoid(e, vec3(0.242, 0.228, 0.132));
+        float padIndent = (1.0 - smoothstep(0.125, 0.170, length((e.xy - vec2(0.0, -0.046)) / vec2(1.06, 0.96)))) * step(0.0, e.z);
+        return dOuter + padIndent * 0.008;
+      }
+
+      float dTorsoPart(vec3 t) {
+        float profile = 1.0 - 0.13 * smoothstep(-0.18, 0.58, t.y);
+        vec3 tp = t;
+        tp.z -= 0.03 * (1.0 - clamp(abs(t.y) / 0.55, 0.0, 1.0));
+        float dBody = sdEllipsoid(tp, vec3(0.495 * profile, 0.615, 0.445 * profile));
+        float dTail = length(t - vec3(0.0, -0.45, -0.43)) - 0.125;
+        return smin(dBody, dTail, 0.026);
+      }
+
+      float dArmPart(vec3 a) {
+        vec3 ap = vec3(a.x, a.y, a.z * 1.18);
+        return sdCapsuleY(ap, 0.205, 0.156, 0.138);
+      }
+
+      float dLegPart(vec3 l) {
+        float dCyl = sdCapsuleY(l, 0.225, 0.182, 0.194);
+        float dFlatSole = -(l.y + 0.365);
+        return -smin(-dCyl, -dFlatSole, 0.045);
+      }
+
+      float mapBear(vec3 wp) {
+        vec3 p = warpPlush(wp);
+        float dH  = dHeadPart((p - uHeadPos) * uHeadMat);
+        float dEL = dEarPart((p - uEarLPos) * uEarLMat);
+        float dER = dEarPart((p - uEarRPos) * uEarRMat);
+        float dHeadAll = smin(dH, min(dEL, dER), 0.022);
+
+        float dT  = dTorsoPart((p - uTorsoPos) * uTorsoMat);
+        float dAL = dArmPart((p - uArmLPos) * uArmLMat);
+        float dAR = dArmPart((p - uArmRPos) * uArmRMat);
+        float dLL = dLegPart((p - uLegLPos) * uLegLMat);
+        float dLR = dLegPart((p - uLegRPos) * uLegRMat);
+
+        float dLimbs = min(min(dAL, dAR), min(dLL, dLR));
+        float dBodyAll = smin(dT, dLimbs, 0.032);
+        return smin(dHeadAll, dBodyAll, 0.038);
+      }
+
+      float sdMatCushion(vec3 p) {
+        if (uShowMat < 0.5) return 1e5;
+        vec3 mp = p - vec3(0.0, -0.035, 0.0);
+        return sdEllipsoid(mp, vec3(2.05, 0.065, 1.38));
+      }
+
+      float mapScene(vec3 p) {
+        return min(mapBear(p), sdMatCushion(p));
+      }
+
+      vec3 calcNormal(vec3 p) {
+        const float h = 0.0016;
+        const vec2 k = vec2(1.0, -1.0);
+        return normalize(
+          k.xyy * mapScene(p + k.xyy * h) +
+          k.yyx * mapScene(p + k.yyx * h) +
+          k.yxy * mapScene(p + k.yxy * h) +
+          k.xxx * mapScene(p + k.xxx * h)
+        );
+      }
+
+      float calcAO(vec3 pos, vec3 nor) {
+        float occ = 0.0;
+        float sca = 1.0;
+        for (int i = 1; i <= 4; i++) {
+          float h = 0.035 + 0.075 * float(i);
+          float d = min(mapScene(pos + h * nor), pos.y + h * nor.y);
+          occ += (h - d) * sca;
+          sca *= 0.68;
+        }
+        return clamp(1.0 - 1.65 * occ, 0.18, 1.0);
+      }
+
+      float calcSoftShadow(vec3 ro, vec3 rd) {
+        float res = 1.0;
+        float t = 0.03;
+        for (int i = 0; i < 22; i++) {
+          float h = mapBear(ro + rd * t);
+          res = min(res, 6.5 * h / t);
+          t += clamp(h, 0.03, 0.18);
+          if (res < 0.02 || t > 3.2) break;
+        }
+        return clamp(res, 0.0, 1.0);
+      }
+
+      void shadeBear(vec3 wp, inout vec3 N, out vec3 albedo, out vec3 sheenCol, out float roughness) {
+        vec3 p = warpPlush(wp);
+
+        vec3 q  = (p - uHeadPos) * uHeadMat;
+        vec3 eL = (p - uEarLPos) * uEarLMat;
+        vec3 eR = (p - uEarRPos) * uEarRMat;
+        vec3 t  = (p - uTorsoPos) * uTorsoMat;
+        vec3 aL = (p - uArmLPos) * uArmLMat;
+        vec3 aR = (p - uArmRPos) * uArmRMat;
+        vec3 lL = (p - uLegLPos) * uLegLMat;
+        vec3 lR = (p - uLegRPos) * uLegRMat;
+
+        float dH  = dHeadPart(q);
+        float dEL = dEarPart(eL);
+        float dER = dEarPart(eR);
+        float dT  = dTorsoPart(t);
+        float dAL = dArmPart(aL);
+        float dAR = dArmPart(aR);
+        float dLL = dLegPart(lL);
+        float dLR = dLegPart(lR);
+
+        vec3 colBrown  = vec3(0.755, 0.502, 0.298);
+        vec3 colWhite  = vec3(0.978, 0.975, 0.985);
+        vec3 colYellow = vec3(0.988, 0.868, 0.425);
+        vec3 colDark   = vec3(0.105, 0.082, 0.078);
+        vec3 colSeam   = vec3(0.565, 0.355, 0.195);
+
+        albedo = colBrown;
+        sheenCol = vec3(0.96, 0.78, 0.56);
+        roughness = 0.88;
+
+        vec3 fabCoord = q * 24.0;
+        float minD = dH;
+        if (dT < minD)  { minD = dT;  fabCoord = t * 24.0 + 11.3; }
+        if (dEL < minD) { minD = dEL; fabCoord = eL * 24.0 + 23.1; }
+        if (dER < minD) { minD = dER; fabCoord = eR * 24.0 + 37.7; }
+        if (dAL < minD) { minD = dAL; fabCoord = aL * 24.0 + 51.2; }
+        if (dAR < minD) { minD = dAR; fabCoord = aR * 24.0 + 67.4; }
+        if (dLL < minD) { minD = dLL; fabCoord = lL * 24.0 + 83.9; }
+        if (dLR < minD) { minD = dLR; fabCoord = lR * 24.0 + 97.5; }
+
+        float seam = 0.0;
+        seam = max(seam, 1.0 - smoothstep(0.0, 0.020, abs(dH - dT) + max(dH, dT)*0.5));
+        seam = max(seam, 1.0 - smoothstep(0.0, 0.016, abs(dH - min(dEL, dER)) + max(dH, min(dEL, dER))*0.5));
+        seam = max(seam, 1.0 - smoothstep(0.0, 0.018, abs(dT - min(dAL, dAR)) + max(dT, min(dAL, dAR))*0.5));
+        seam = max(seam, 1.0 - smoothstep(0.0, 0.020, abs(dT - min(dLL, dLR)) + max(dT, min(dLL, dLR))*0.5));
+
+        if (dH < 0.045 && q.z > -0.15) {
+          vec2 symQ = vec2(abs(q.x), q.y);
+          float dGusset = sdSeg2D(symQ, vec2(0.125, 0.005), vec2(0.475, 0.455));
+          float gussetSeam = (1.0 - smoothstep(0.001, 0.011, dGusset)) * smoothstep(0.08, 0.28, q.z);
+          float dChinDart = sdSeg2D(q.xy, vec2(0.0, -0.330), vec2(0.0, -0.515));
+          float chinSeam = (1.0 - smoothstep(0.001, 0.012, dChinDart)) * smoothstep(0.05, 0.28, q.z);
+          float dCheekDart = sdSeg2D(symQ, vec2(0.355, -0.360), vec2(0.390, -0.505));
+          float cheekSeam = (1.0 - smoothstep(0.001, 0.012, dCheekDart)) * smoothstep(0.02, 0.24, q.z);
+          seam = max(seam, max(gussetSeam * 0.34, max(chinSeam * 0.48, cheekSeam * 0.32)));
+        }
+
+        albedo = mix(albedo, colSeam, seam * 0.38);
+
+        if (dEL < 0.035 && eL.z > 0.01) {
+          float rEar = length((eL.xy - vec2(0.0, -0.046)) / vec2(0.168, 0.156));
+          float wEar = 1.0 - smoothstep(0.94, 1.03, rEar);
+          float rim  = 1.0 - smoothstep(0.0, 0.08, abs(rEar - 0.98));
+          albedo = mix(albedo, colYellow, wEar);
+          albedo = mix(albedo, colSeam, rim * 0.22);
+          sheenCol = mix(sheenCol, vec3(1.0, 0.95, 0.72), wEar);
+        }
+        if (dER < 0.035 && eR.z > 0.01) {
+          float rEar = length((eR.xy - vec2(0.0, -0.046)) / vec2(0.168, 0.156));
+          float wEar = 1.0 - smoothstep(0.94, 1.03, rEar);
+          float rim  = 1.0 - smoothstep(0.0, 0.08, abs(rEar - 0.98));
+          albedo = mix(albedo, colYellow, wEar);
+          albedo = mix(albedo, colSeam, rim * 0.22);
+          sheenCol = mix(sheenCol, vec3(1.0, 0.95, 0.72), wEar);
+        }
+
+        if (dAL < 0.03) {
+          float pawMask = (1.0 - smoothstep(-0.15, -0.07, aL.y)) * (1.0 - smoothstep(-0.08, -0.01, aL.x));
+          albedo = mix(albedo, colYellow, pawMask * 0.95);
+        }
+        if (dAR < 0.03) {
+          float pawMask = (1.0 - smoothstep(-0.15, -0.07, aR.y)) * smoothstep(0.01, 0.08, aR.x);
+          albedo = mix(albedo, colYellow, pawMask * 0.95);
+        }
+        if (dLL < 0.03 && lL.y < -0.26) {
+          float rSole = length(lL.xz / vec2(0.138, 0.150));
+          float wSole = (1.0 - smoothstep(0.92, 1.04, rSole)) * (1.0 - smoothstep(-0.32, -0.26, lL.y));
+          albedo = mix(albedo, colYellow, wSole);
+        }
+        if (dLR < 0.03 && lR.y < -0.26) {
+          float rSole = length(lR.xz / vec2(0.138, 0.150));
+          float wSole = (1.0 - smoothstep(0.92, 1.04, rSole)) * (1.0 - smoothstep(-0.32, -0.26, lR.y));
+          albedo = mix(albedo, colYellow, wSole);
+        }
+
+        if (dT < 0.04) {
+          if (t.z > 0.12) {
+            float rBelly = length((t.xy - vec2(0.0, 0.025)) / vec2(0.365, 0.435));
+            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.12, 0.22, t.z);
+            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.12, 0.22, t.z);
+            albedo = mix(albedo, colWhite, wBelly);
+            albedo = mix(albedo, vec3(0.76, 0.68, 0.62), bellySeam * 0.28);
+            sheenCol = mix(sheenCol, vec3(1.0, 1.0, 1.0), wBelly);
+          }
+          if (t.z < -0.25) {
+            float backLine = (1.0 - smoothstep(0.002, 0.012, abs(t.x))) * step(abs(t.y - 0.08), 0.30);
+            albedo = mix(albedo, colSeam * 0.85, backLine * 0.65);
+            float zipTrack = (1.0 - smoothstep(0.004, 0.014, abs(t.x))) * step(abs(t.y - 0.14), 0.16);
+            albedo = mix(albedo, vec3(0.72, 0.85, 0.94), zipTrack * 0.85);
+            float zipPull = 1.0 - smoothstep(0.018, 0.026, length(t.xy - vec2(0.0, 0.27)));
+            albedo = mix(albedo, vec3(0.58, 0.79, 0.95), zipPull);
+          }
+        }
+
+        float feltRelief = 0.0;
+        if (dH < 0.045 && q.z > 0.20) {
+          vec2 sp = q.xy - vec2(0.0, -0.150);
+          float rSnout = snoutContour(sp);
+          float wSnout = (1.0 - smoothstep(0.955, 1.025, rSnout)) * smoothstep(0.32, 0.44, q.z);
+          float snoutSeam = (1.0 - smoothstep(0.0, 0.055, abs(rSnout - 0.99))) * smoothstep(0.30, 0.44, q.z);
+          albedo = mix(albedo, colWhite, wSnout);
+          albedo = mix(albedo, colSeam, snoutSeam * 0.26);
+          sheenCol = mix(sheenCol, vec3(1.0), wSnout);
+
+          vec2 np = sp - vec2(0.0, 0.045);
+          float nTaper = 1.0 + 0.11 * clamp(np.y / 0.041, -1.0, 1.0);
+          float dNose = (length(vec2(np.x / (0.048 * nTaper), np.y / 0.041)) - 1.0) * 0.042;
+
+          float dBridge = sdSeg2D(sp, vec2(0.0, 0.028), vec2(0.0, -0.004)) - 0.0175;
+          vec2 mp = vec2(abs(sp.x), sp.y);
+          float dMouthCurve = sdMouthBezier(
+            mp,
+            vec2(0.000, 0.000),
+            vec2(0.036, -0.050),
+            vec2(0.100, -0.058)
+          ) - 0.0190;
+
+          float dNoseMouth = smin(dNose, min(dBridge, dMouthCurve), 0.0065);
+          float wNM = (1.0 - smoothstep(-0.0025, 0.0045, dNoseMouth)) * wSnout;
+          albedo = mix(albedo, colDark, wNM);
+          roughness = mix(roughness, 0.60, wNM);
+          feltRelief = max(feltRelief, (1.0 - smoothstep(-0.008, 0.006, dNoseMouth)) * wSnout);
+
+          vec2 bp = vec2(abs(q.x) - 0.47, q.y + 0.21);
+          float blushMask = exp(-dot(bp / vec2(0.115, 0.075), bp / vec2(0.115, 0.075)));
+          albedo = mix(albedo, vec3(0.93, 0.49, 0.46), blushMask * uBlush * 0.52);
+
+          vec2 epRaw = vec2(abs(q.x) - 0.375, q.y + 0.088);
+          vec2 ep = vec2(epRaw.x * 0.9816 - epRaw.y * 0.1908, epRaw.x * 0.1908 + epRaw.y * 0.9816);
+          float dEye = 1.0;
+          if (uExpr == 0) {
+            dEye = sdSeg2D(ep, vec2(-0.033, 0.0), vec2(0.033, 0.0)) - 0.0255;
+          } else if (uExpr == 1) {
+            float arcY = -0.016 + 0.026 * (1.0 - (epRaw.x / 0.054) * (epRaw.x / 0.054));
+            dEye = (abs(epRaw.x) < 0.056) ? abs(epRaw.y - arcY) - 0.0135 : length(vec2(abs(epRaw.x) - 0.056, epRaw.y + 0.016)) - 0.0135;
+          } else if (uExpr == 2) {
+            float arcY = 0.010 - 0.020 * (1.0 - (epRaw.x / 0.054) * (epRaw.x / 0.054));
+            dEye = (abs(epRaw.x) < 0.056) ? abs(epRaw.y - arcY) - 0.0125 : length(vec2(abs(epRaw.x) - 0.056, epRaw.y - 0.010)) - 0.0125;
+          } else {
+            float s1 = sdSeg2D(epRaw, vec2(-0.040, 0.0), vec2(0.042, 0.034)) - 0.0135;
+            float s2 = sdSeg2D(epRaw, vec2(-0.040, 0.0), vec2(0.042, -0.034)) - 0.0135;
+            dEye = min(s1, s2);
+          }
+          float wEye = (1.0 - smoothstep(-0.0025, 0.0045, dEye)) * smoothstep(0.24, 0.36, q.z);
+          albedo = mix(albedo, colDark, wEye);
+          roughness = mix(roughness, 0.55, wEye);
+          feltRelief = max(feltRelief, (1.0 - smoothstep(-0.008, 0.006, dEye)) * smoothstep(0.24, 0.36, q.z));
+        }
+
+        float napFine = noise3(fabCoord * 1.9);
+        float napPile = noise3(fabCoord * 0.35);
+        float nap = (napFine - 0.5) * 0.045 + (napPile - 0.5) * 0.035;
+        albedo *= (1.0 + nap * uFuzzGain);
+
+        vec3 fuzzN = vec3(
+          noise3(fabCoord * 1.6 + vec3(3.1, 0.0, 0.0)) - 0.5,
+          noise3(fabCoord * 1.6 + vec3(0.0, 5.7, 0.0)) - 0.5,
+          noise3(fabCoord * 1.6 + vec3(0.0, 0.0, 8.3)) - 0.5
+        );
+        N = normalize(N + fuzzN * (0.065 * uFuzzGain) - N * seam * 0.08 + vec3(0.0, 0.04, 0.06) * feltRelief);
+      }
+
+      void main() {
+        vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+        vec3 ro = uCamPos;
+        vec3 rd = normalize(uCamFwd * 1.95 + uCamRight * uv.x + uCamUp * uv.y);
+
+        float vig = length(uv * vec2(0.65, 0.85));
+        vec3 bgLight = mix(vec3(0.985, 0.980, 0.972), vec3(0.935, 0.922, 0.905), smoothstep(0.0, 0.95, vig));
+        vec3 bgDark  = mix(vec3(0.155, 0.138, 0.132), vec3(0.085, 0.078, 0.078), smoothstep(0.0, 0.95, vig));
+        vec3 col = mix(bgDark, bgLight, uIsLight);
+
+        vec3 bCenter = vec3(-0.08, 0.52, 0.0);
+        float bRad = 2.45;
+        vec3 oc = ro - bCenter;
+        float bB = dot(oc, rd);
+        float bC = dot(oc, oc) - bRad * bRad;
+        float bDisc = bB * bB - bC;
+
+        float tHit = -1.0;
+        if (bDisc > 0.0) {
+          float sq = sqrt(bDisc);
+          float tStart = max(0.05, -bB - sq);
+          float tEnd   = -bB + sq;
+          if (tEnd > 0.0) {
+            float t = tStart;
+            for (int i = 0; i < 60; i++) {
+              float d = mapScene(ro + rd * t);
+              if (d < 0.0018) {
+                tHit = t;
+                break;
+              }
+              t += d * 0.82;
+              if (t > tEnd) break;
+            }
+          }
+        }
+
+        vec3 Lkey = normalize(vec3(-0.28, 0.82, 0.50));
+        vec3 Lfill = normalize(vec3(0.65, 0.35, 0.65));
+
+        if (tHit > 0.0) {
+          vec3 pHit = ro + rd * tHit;
+          vec3 N = calcNormal(pHit);
+          vec3 V = -rd;
+          float ao = calcAO(pHit, N);
+
+          float dBearHere = mapBear(pHit);
+          float dMatHere  = sdMatCushion(pHit);
+
+          if (dMatHere < dBearHere) {
+            vec2 mp = pHit.xz * 3.8;
+            vec2 cell = fract(mp) - 0.5;
+            float dotMask = 1.0 - smoothstep(0.14, 0.18, length(cell));
+            vec3 matBase = mix(vec3(0.28, 0.25, 0.24), vec3(0.97, 0.94, 0.88), uIsLight);
+            vec3 matDot  = mix(vec3(0.36, 0.31, 0.26), vec3(0.99, 0.89, 0.62), uIsLight);
+            vec3 matCol  = mix(matBase, matDot, dotMask * 0.65);
+
+            float sh = calcSoftShadow(pHit + N * 0.015, Lkey);
+            float diff = clamp((dot(N, Lkey) + 0.4) / 1.4, 0.0, 1.0);
+            float rim  = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+            col = matCol * (0.48 + 0.56 * diff * (0.35 + 0.65 * sh)) * ao + vec3(0.12, 0.10, 0.08) * rim;
+          } else {
+            vec3 albedo, sheenCol;
+            float rough;
+            shadeBear(pHit, N, albedo, sheenCol, rough);
+
+            float sh = calcSoftShadow(pHit + N * 0.018, Lkey);
+            float wrapKey  = clamp((dot(N, Lkey) + 0.48) / 1.48, 0.0, 1.0);
+            float wrapFill = clamp((dot(N, Lfill) + 0.55) / 1.55, 0.0, 1.0);
+            float skyAmb   = 0.5 + 0.5 * N.y;
+            float bounce   = clamp(-N.y, 0.0, 1.0);
+
+            vec3 shadowTint = mix(albedo * vec3(0.62, 0.52, 0.46), albedo, 0.32);
+            vec3 litCol = mix(shadowTint, albedo * 1.06, wrapKey * (0.42 + 0.58 * sh));
+            litCol += albedo * wrapFill * 0.18;
+            litCol += albedo * skyAmb * 0.12;
+            litCol += albedo * vec3(1.0, 0.90, 0.78) * bounce * 0.10;
+
+            float ndv = max(dot(N, V), 0.0);
+            float velvetRim = pow(1.0 - ndv, 3.1) * (0.35 + 0.65 * skyAmb);
+            litCol += sheenCol * velvetRim * (0.36 * uFuzzGain);
+
+            vec3 H = normalize(Lkey + V);
+            float feltSpec = pow(max(dot(N, H), 0.0), 22.0) * (1.0 - rough) * 0.35;
+            litCol += vec3(feltSpec) * sh;
+
+            col = litCol * mix(0.45, 1.0, ao);
+          }
+        } else if (rd.y < -0.001) {
+          float tFloor = -ro.y / rd.y;
+          if (tFloor > 0.0 && tFloor < 34.0) {
+            vec3 pFloor = ro + rd * tFloor;
+            float distOrigin = length(pFloor.xz * vec2(0.55, 0.85));
+            float fade = 1.0 - smoothstep(1.2, 3.4, distOrigin);
+            if (fade > 0.001) {
+              float dNear = mapBear(pFloor + vec3(0.0, 0.09, 0.0));
+              float contactAO = 1.0 - exp(-max(dNear, 0.0) * 4.2);
+              float dirSh = calcSoftShadow(pFloor + vec3(0.0, 0.015, 0.0), Lkey);
+              float shadowStrength = (1.0 - min(contactAO, 0.45 + 0.55 * dirSh)) * fade;
+              vec3 shadowTone = mix(vec3(0.03, 0.025, 0.025), vec3(0.84, 0.80, 0.76), uIsLight);
+              col = mix(col, shadowTone, shadowStrength * mix(0.62, 0.48, uIsLight));
+            }
+          }
+        }
+
+        col = clamp(col, 0.0, 1.0);
+        col = pow(col, vec3(0.95));
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `;
+
+    function compileShader(type, src) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(s));
+      }
+      return s;
+    }
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compileShader(gl.VERTEX_SHADER, vertSrc));
+    gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, fragSrc));
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const quadBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    const aPosLoc = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPosLoc);
+    gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const U = {};
+    [
+      'uRes','uTime','uCamPos','uCamFwd','uCamRight','uCamUp',
+      'uIsLight','uShowMat','uFuzzGain','uExpr','uBlush',
+      'uPokePos','uPokeDir','uPokeAmp',
+      'uHeadPos','uHeadMat','uEarLPos','uEarLMat','uEarRPos','uEarRMat',
+      'uTorsoPos','uTorsoMat','uArmLPos','uArmLMat','uArmRPos','uArmRMat',
+      'uLegLPos','uLegLMat','uLegRPos','uLegRMat'
+    ].forEach(name => { U[name] = gl.getUniformLocation(prog, name); });
+
+    function attachEarsToHead(headPos, headBasis, wiggleL, wiggleR) {
+      const earLPos = localToWorld(headPos, headBasis, [0.615, 0.445, -0.030]);
+      const earLX = localToWorld([0,0,0], headBasis, [Math.cos(0.58 + wiggleL), -Math.sin(0.58 + wiggleL), 0]);
+      const earLY = localToWorld([0,0,0], headBasis, [Math.sin(0.58 + wiggleL),  Math.cos(0.58 + wiggleL), 0.05]);
+      const earLMat = makeBasisXY(earLX, earLY);
+
+      const earRPos = localToWorld(headPos, headBasis, [-0.615, 0.445, -0.030]);
+      const earRX = localToWorld([0,0,0], headBasis, [Math.cos(-0.58 - wiggleR), -Math.sin(-0.58 - wiggleR), 0]);
+      const earRY = localToWorld([0,0,0], headBasis, [Math.sin(-0.58 - wiggleR),  Math.cos(-0.58 - wiggleR), 0.05]);
+      const earRMat = makeBasisXY(earRX, earRY);
+
+      return { earLPos, earLMat, earRPos, earRMat };
+    }
+
+    function computeTargetPose(poseIdx, t, reactWave, earBounce) {
+      const breath = Math.sin(t * 2.1);
+      let headPos, headMat, torsoPos, torsoMat, armLPos, armLMat, armRPos, armRMat, legLPos, legLMat, legRPos, legRMat;
+      let wigL = earBounce * Math.sin(t * 16.0) * 0.22;
+      let wigR = earBounce * Math.cos(t * 15.0) * 0.22;
+
+      if (poseIdx === 0) {
+        headPos = [-0.88, 0.675 + breath * 0.008, 0.05];
+        headMat = makeBasisXY(
+          [0.34, 0.90, -0.26],
+          [-0.91, 0.37 + breath * 0.015, 0.14]
+        );
+        wigL += Math.sin(t * 1.4) * 0.035;
+
+        torsoPos = [0.14, 0.445 + breath * 0.012, -0.01];
+        torsoMat = makeBasisYZ(
+          [-0.992, 0.11, 0.03],
+          [0.09, 0.81, 0.58]
+        );
+
+        const wave = reactWave * Math.sin(t * 14.0) * 0.22;
+        armRPos = [-0.21, 0.28 + wave * 0.08, 0.39];
+        armRMat = makeBasisYZ(
+          [-0.38, 0.76 - wave * 0.3, -0.52],
+          [0.20, 0.55, 0.81]
+        );
+
+        armLPos = [-0.18, 0.46, -0.42];
+        armLMat = makeBasisYZ(
+          [-0.30, 0.52, 0.80],
+          [0.10, 0.84, -0.52]
+        );
+
+        legRPos = [0.92, 0.335, 0.16];
+        legRMat = makeBasisYZ(
+          [-0.995, 0.06, -0.04],
+          [0.05, 0.82, 0.57]
+        );
+
+        legLPos = [0.89, 0.425 + Math.sin(t * 1.8) * 0.008, -0.17];
+        legLMat = makeBasisYZ(
+          [-0.992, 0.09, 0.06],
+          [0.08, 0.84, 0.54]
+        );
+
+      } else if (poseIdx === 1) {
+        headPos = [-0.90, 0.56, 0.0];
+        headMat = makeBasisYZ(
+          [-0.99, 0.12, 0.0],
+          [0.12, 0.99, 0.04 * Math.sin(t * 1.1)]
+        );
+
+        torsoPos = [0.16, 0.44 + breath * 0.022, 0.0];
+        torsoMat = makeBasisYZ([-1.0, 0.02, 0.0], [0.02, 1.0, 0.0]);
+
+        const flap = Math.sin(t * 1.6) * 0.04 + reactWave * Math.sin(t * 14.0) * 0.25;
+        armLPos = [-0.22, 0.30 + flap * 0.1, -0.54];
+        armLMat = makeBasisYZ([-0.35, 0.28, 0.89], [0.0, 0.95, -0.30]);
+
+        armRPos = [-0.22, 0.30 + flap * 0.1, 0.54];
+        armRMat = makeBasisYZ([-0.35, 0.28, -0.89], [0.0, 0.95, 0.30]);
+
+        legLPos = [0.92, 0.29, -0.23];
+        legLMat = makeBasisYZ([-0.96, 0.10, 0.24], [0.10, 0.99, 0.0]);
+
+        legRPos = [0.92, 0.29, 0.23];
+        legRMat = makeBasisYZ([-0.96, 0.10, -0.24], [0.10, 0.99, 0.0]);
+
+      } else if (poseIdx === 2) {
+        const tilt = Math.sin(t * 1.7) * 0.06;
+        headPos = [tilt * 0.25, 1.24 + breath * 0.012, 0.04];
+        headMat = makeBasisXY(
+          [Math.cos(tilt), Math.sin(tilt), 0.0],
+          [-Math.sin(tilt), Math.cos(tilt), -0.06]
+        );
+
+        torsoPos = [0.0, 0.54 + breath * 0.01, -0.02];
+        torsoMat = makeBasisYZ([0.0, 1.0, -0.05], [0.0, 0.05, 1.0]);
+
+        const wave = 0.22 * Math.sin(t * 3.4) + reactWave * Math.sin(t * 14.0) * 0.42;
+        armLPos = [0.50, 0.88 + wave * 0.08, 0.14];
+        armLMat = makeBasisYZ([-0.62, -0.68 + wave * 0.45, -0.22], [0.0, -0.28, 0.96]);
+
+        armRPos = [-0.51, 0.58, 0.14];
+        armRMat = makeBasisYZ([0.62, 0.74, -0.24], [0.0, 0.30, 0.95]);
+
+        legLPos = [0.27, 0.20, 0.36];
+        legLMat = makeBasisYZ([-0.14, 0.06, -0.98], [0.0, 1.0, 0.06]);
+
+        legRPos = [-0.27, 0.20, 0.36];
+        legRMat = makeBasisYZ([0.14, 0.06, -0.98], [0.0, 1.0, 0.06]);
+
+      } else {
+        headPos = [-0.82, 0.64 + breath * 0.01, 0.08];
+        headMat = makeBasisYZ(
+          [-0.10, 0.99, -0.04],
+          [-0.48, 0.02, 0.88]
+        );
+
+        torsoPos = [0.16, 0.41 + breath * 0.012, -0.02];
+        torsoMat = makeBasisYZ([-0.99, 0.06, 0.08], [-0.06, -0.99, 0.08]);
+
+        armRPos = [-0.46, 0.21, 0.42];
+        armRMat = makeBasisYZ([0.52, 0.42, -0.74], [0.0, 0.88, 0.46]);
+
+        armLPos = [-0.30, 0.21, -0.42];
+        armLMat = makeBasisYZ([0.38, 0.42, 0.82], [0.0, 0.88, -0.46]);
+
+        const kick = Math.sin(t * 4.4 + reactWave * 6.0) * 0.24;
+        legRPos = [0.90, 0.36 + Math.max(0, kick) * 0.26, 0.20];
+        legRMat = makeBasisYZ([-0.88, -0.42 - kick * 0.85, -0.06], [0.42, -0.90, 0.0]);
+
+        legLPos = [0.88, 0.36 + Math.max(0, -kick) * 0.26, -0.22];
+        legLMat = makeBasisYZ([-0.88, -0.42 + kick * 0.85, 0.06], [0.42, -0.90, 0.0]);
+      }
+
+      const ears = attachEarsToHead(headPos, headMat, wigL, wigR);
+      return {
+        headPos, headMat,
+        earLPos: ears.earLPos, earLMat: ears.earLMat,
+        earRPos: ears.earRPos, earRMat: ears.earRMat,
+        torsoPos, torsoMat,
+        armLPos, armLMat, armRPos, armRMat,
+        legLPos, legLMat, legRPos, legRMat
+      };
+    }
+
+    const boneNames = ['head','earL','earR','torso','armL','armR','legL','legR'];
+    let curBones = null;
+
+    function updateSmoothedBones(target, dt) {
+      const k = 1.0 - Math.exp(-dt * 9.5);
+      if (!curBones) {
+        curBones = {};
+        boneNames.forEach(b => {
+          curBones[b + 'Pos'] = [...target[b + 'Pos']];
+          curBones[b + 'Quat'] = basisToQuat(target[b + 'Mat']);
+          curBones[b + 'Mat'] = [...target[b + 'Mat']];
+        });
+        return;
+      }
+      boneNames.forEach(b => {
+        curBones[b + 'Pos'] = v3.lerp(curBones[b + 'Pos'], target[b + 'Pos'], k);
+        const tq = basisToQuat(target[b + 'Mat']);
+        curBones[b + 'Quat'] = quatSlerp(curBones[b + 'Quat'], tq, k);
+        curBones[b + 'Mat'] = quatToBasis(curBones[b + 'Quat']);
+      });
+    }
+
+    const DEFAULT_CAM = { yaw: 0.0, pitch: 0.075, dist: 4.15, target: [-0.04, 0.53, 0.02] };
+    let cam = { yaw: DEFAULT_CAM.yaw, pitch: DEFAULT_CAM.pitch, dist: DEFAULT_CAM.dist, target: [...DEFAULT_CAM.target] };
+    let camVel = { yaw: 0, pitch: 0 };
+
+    let currentPose = 0;
+    let baseExpr = 0;
+    let tempBoopTimer = 0;
+    let kneadMode = false;
+    let showMat = 0.0;
+    let squishGain = 1.1;
+    let fuzzGain = 1.0;
+    let isLightTheme = 1.0;
+
+    let pokePos = [0, 0.5, 0];
+    let pokeDir = [0, 0, -1];
+    let pokeAmp = 0.0;
+    let pokeVel = 0.0;
+    let pokeTarget = 0.0;
+    let reactWave = 0.0;
+    let earBounce = 0.0;
+    let blushLevel = 0.15;
+
+    function getCameraBasis() {
+      const aspect = (viewport.clientWidth || 1) / Math.max(viewport.clientHeight || 1, 1);
+      // Auto-adapt distance on narrow portrait screens (e.g. iPhone vertical view) so full bear fits
+      const portraitFit = currentPose === 2
+        ? Math.max(1.0, 0.92 / Math.max(aspect, 0.38))
+        : Math.max(1.0, 1.48 / Math.max(aspect, 0.38));
+      const effDist = cam.dist * portraitFit;
+
+      const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      const sy = Math.sin(cam.yaw),   cy = Math.cos(cam.yaw);
+      const pos = [
+        cam.target[0] + sy * cp * effDist,
+        cam.target[1] + sp * effDist,
+        cam.target[2] + cy * cp * effDist
+      ];
+      const fwd = v3.norm(v3.sub(cam.target, pos));
+      const right = v3.norm(v3.cross(fwd, [0, 1, 0]));
+      const up = v3.norm(v3.cross(right, fwd));
+      return { pos, fwd, right, up };
+    }
+
+    function raycastPlushie(clientX, clientY) {
+      if (!curBones) return null;
+      const rect = canvas.getBoundingClientRect();
+      const ux = ((clientX - rect.left) - 0.5 * rect.width) / rect.height;
+      const uy = ((rect.bottom - clientY) - 0.5 * rect.height) / rect.height;
+      const { pos: ro, fwd, right, up } = getCameraBasis();
+      const rd = v3.norm([
+        fwd[0]*1.95 + right[0]*ux + up[0]*uy,
+        fwd[1]*1.95 + right[1]*ux + up[1]*uy,
+        fwd[2]*1.95 + right[2]*ux + up[2]*uy
+      ]);
+
+      const parts = [
+        { id: 'head',  label: '軟綿綿饅頭臉頰', pos: curBones.headPos,  mat: curBones.headMat,  r: [0.81, 0.62, 0.58] },
+        { id: 'earL',  label: '左耳黃色軟墊', pos: curBones.earLPos, mat: curBones.earLMat, r: [0.28, 0.26, 0.15] },
+        { id: 'earR',  label: '右耳黃色軟墊', pos: curBones.earRPos, mat: curBones.earRMat, r: [0.28, 0.26, 0.15] },
+        { id: 'torso', label: '圓滾滾白肚肚', pos: curBones.torsoPos, mat: curBones.torsoMat, r: [0.50, 0.62, 0.45] },
+        { id: 'armL',  label: '小短手肉球', pos: curBones.armLPos,  mat: curBones.armLMat,  r: [0.17, 0.34, 0.16] },
+        { id: 'armR',  label: '小短手肉球', pos: curBones.armRPos,  mat: curBones.armRMat,  r: [0.17, 0.34, 0.16] },
+        { id: 'legL',  label: '短腿黃色腳掌', pos: curBones.legLPos, mat: curBones.legLMat, r: [0.20, 0.39, 0.20] },
+        { id: 'legR',  label: '短腿黃色腳掌', pos: curBones.legRPos, mat: curBones.legRMat, r: [0.20, 0.39, 0.20] }
+      ];
+
+      let best = null;
+      for (const part of parts) {
+        const lo = worldToLocal(part.pos, part.mat, ro);
+        const ld = worldToLocal([0,0,0], part.mat, rd);
+        const ox = lo[0]/part.r[0], oy = lo[1]/part.r[1], oz = lo[2]/part.r[2];
+        const dx = ld[0]/part.r[0], dy = ld[1]/part.r[1], dz = ld[2]/part.r[2];
+        const A = dx*dx + dy*dy + dz*dz;
+        const B = ox*dx + oy*dy + oz*dz;
+        const C = ox*ox + oy*oy + oz*oz - 1.0;
+        const disc = B*B - A*C;
+        if (disc >= 0) {
+          const t = (-B - Math.sqrt(disc)) / A;
+          if (t > 0.05 && (!best || t < best.t)) {
+            const hitWorld = v3.add(ro, v3.scale(rd, t));
+            const hitLocal = v3.add(lo, v3.scale(ld, t));
+            let label = part.label;
+            let isSnout = false;
+            if (part.id === 'head' && hitLocal[2] > 0.35 && Math.hypot(hitLocal[0], hitLocal[1] + 0.17) < 0.27) {
+              label = '立體白嘴墊 & 小鼻頭 Boop!';
+              isSnout = true;
+            } else if (part.id === 'torso' && hitLocal[2] < -0.22) {
+              label = '背後秘密小拉鍊 & 圓尾巴';
+            }
+            const nLocal = v3.norm([hitLocal[0]/(part.r[0]*part.r[0]), hitLocal[1]/(part.r[1]*part.r[1]), hitLocal[2]/(part.r[2]*part.r[2])]);
+            const nWorld = localToWorld([0,0,0], part.mat, nLocal);
+            best = { t, id: part.id, label, isSnout, point: hitWorld, inward: v3.scale(nWorld, -1), rayDir: rd };
+          }
+        }
+      }
+      return best;
+    }
+
+    function spawnFloatingEmoji(clientX, clientY, symbol) {
+      const rect = viewport.getBoundingClientRect();
+      const el = document.createElement('div');
+      el.className = 'fx-pop';
+      el.textContent = symbol;
+      el.style.left = (clientX - rect.left) + 'px';
+      el.style.top = (clientY - rect.top - 6) + 'px';
+      fxLayer.appendChild(el);
+      setTimeout(() => el.remove(), 980);
+    }
+
+    function showToast(msg) {
+      partToast.textContent = msg;
+    }
+
+    const activePointers = new Map();
+    let pointerDown = false;
+    let lastX = 0, lastY = 0;
+    let lastPinchDist = 0;
+    let movedDist = 0;
+    let downHit = null;
+    let downTime = 0;
+
+    // Prevent iOS Safari page gesture zoom
+    document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        pokeTarget = 0.0;
+        downHit = null;
+        return;
+      }
+
+      pointerDown = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      movedDist = 0;
+      downTime = performance.now();
+      camVel.yaw = 0;
+      camVel.pitch = 0;
+
+      downHit = raycastPlushie(e.clientX, e.clientY);
+      if (downHit) {
+        pokePos = downHit.point;
+        pokeDir = v3.norm(v3.add(downHit.inward, downHit.rayDir));
+        pokeTarget = 0.85 * squishGain;
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.size >= 2) {
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (lastPinchDist > 0) {
+          const scale = lastPinchDist / Math.max(dist, 10);
+          cam.dist = Math.max(2.2, Math.min(6.6, cam.dist * scale));
+        }
+        lastPinchDist = dist;
+        movedDist += 20;
+        return;
+      }
+
+      if (!pointerDown) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      movedDist += Math.hypot(dx, dy);
+
+      if (kneadMode && downHit) {
+        const hit = raycastPlushie(e.clientX, e.clientY);
+        if (hit) {
+          pokePos = hit.point;
+          pokeDir = v3.norm(v3.add(hit.inward, hit.rayDir));
+          pokeTarget = 1.15 * squishGain;
+          blushLevel = Math.min(1.0, blushLevel + 0.04);
+          showToast('揉捏中：' + hit.label + ' ✨');
+          if (Math.random() < 0.14) spawnFloatingEmoji(e.clientX, e.clientY, '💛');
+        }
+        return;
+      }
+
+      if (movedDist > 5) {
+        pokeTarget = 0.0;
+        cam.yaw -= dx * 0.0072;
+        cam.pitch = Math.max(-0.35, Math.min(1.38, cam.pitch + dy * 0.0062));
+        camVel.yaw = -dx * 0.0032;
+        camVel.pitch = dy * 0.0025;
+      }
+    });
+
+    function handlePointerRelease(e) {
+      activePointers.delete(e.pointerId);
+      if (activePointers.size === 1) {
+        const rem = Array.from(activePointers.values())[0];
+        lastX = rem.x;
+        lastY = rem.y;
+        lastPinchDist = 0;
+        return;
+      }
+      if (!pointerDown) return;
+      pointerDown = false;
+      lastPinchDist = 0;
+      const elapsed = performance.now() - downTime;
+
+      if (downHit && (movedDist < 9 || kneadMode) && elapsed < 500) {
+        pokePos = downHit.point;
+        pokeDir = v3.norm(v3.add(downHit.inward, downHit.rayDir));
+        pokeAmp = 1.05 * squishGain;
+        pokeVel = -9.5 * squishGain;
+        earBounce = 1.0;
+        reactWave = 1.0;
+        blushLevel = 0.95;
+
+        if (downHit.isSnout) {
+          tempBoopTimer = 1.1;
+          spawnFloatingEmoji(e.clientX, e.clientY, '✨');
+        } else if (downHit.id === 'earL' || downHit.id === 'earR') {
+          spawnFloatingEmoji(e.clientX, e.clientY, '🎵');
+        } else {
+          spawnFloatingEmoji(e.clientX, e.clientY, '💛');
+        }
+        showToast('戳了一下：' + downHit.label);
+      }
+      pokeTarget = 0.0;
+      downHit = null;
+    }
+
+    canvas.addEventListener('pointerup', handlePointerRelease);
+    canvas.addEventListener('pointercancel', handlePointerRelease);
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      cam.dist = Math.max(2.35, Math.min(6.4, cam.dist + e.deltaY * 0.0032));
+    }, { passive: false });
+
+    const poseBtns = document.querySelectorAll('.pose-btn');
+    const poseNames = ['經典側躺', '仰躺午睡', '乖乖坐姿', '趴趴踢腿'];
+    poseBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentPose = parseInt(btn.dataset.pose, 10);
+        poseBtns.forEach(b => b.classList.toggle('active', b === btn));
+        cam.target = currentPose === 2 ? [0.0, 0.66, 0.0] : [...DEFAULT_CAM.target];
+        earBounce = 0.85;
+        showToast('切換姿勢：' + poseNames[currentPose]);
+      });
+    });
+
+    const exprNames = ['慵懶原版', '開心瞇眼', '香甜熟睡', '呆萌 > <'];
+    document.getElementById('exprBtn').addEventListener('click', () => {
+      baseExpr = (baseExpr + 1) % exprNames.length;
+      document.getElementById('exprLabel').textContent = exprNames[baseExpr];
+      if (baseExpr === 1) blushLevel = 0.9;
+      earBounce = 0.6;
+    });
+
+    const modeBtn = document.getElementById('modeBtn');
+    modeBtn.addEventListener('click', () => {
+      kneadMode = !kneadMode;
+      modeBtn.textContent = kneadMode ? '🤏 連續揉捏模式' : '🔄 旋轉 + 點擊戳戳';
+      modeBtn.classList.toggle('active', kneadMode);
+      canvas.style.cursor = kneadMode ? 'pointer' : 'grab';
+      showToast(kneadMode ? '在玩偶上按住拖曳即可連續揉捏軟Q絨毛！' : '拖曳旋轉 360° 視角，點擊玩偶可戳戳互動');
+    });
+
+    const matBtn = document.getElementById('matBtn');
+    matBtn.addEventListener('click', () => {
+      showMat = showMat > 0.5 ? 0.0 : 1.0;
+      matBtn.classList.toggle('active', showMat > 0.5);
+    });
+
+    const themeBtn = document.getElementById('themeBtn');
+    themeBtn.addEventListener('click', () => {
+      isLightTheme = isLightTheme > 0.5 ? 0.0 : 1.0;
+      document.documentElement.classList.toggle('dark', isLightTheme < 0.5);
+      document.documentElement.classList.toggle('light', isLightTheme > 0.5);
+      themeBtn.textContent = isLightTheme > 0.5 ? '🌙 深色棚拍' : '☀️ 明亮棚拍';
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      currentPose = 0;
+      poseBtns.forEach((b, idx) => b.classList.toggle('active', idx === 0));
+      cam.yaw = DEFAULT_CAM.yaw;
+      cam.pitch = DEFAULT_CAM.pitch;
+      cam.dist = DEFAULT_CAM.dist;
+      cam.target = [...DEFAULT_CAM.target];
+      camVel.yaw = 0;
+      camVel.pitch = 0;
+      showToast('已回到參考圖經典側躺視角');
+    });
+
+    document.getElementById('squishSlider').addEventListener('input', (e) => {
+      squishGain = parseFloat(e.target.value) / 100.0;
+    });
+    document.getElementById('fuzzSlider').addEventListener('input', (e) => {
+      fuzzGain = parseFloat(e.target.value) / 100.0;
+    });
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+      const w = Math.max(1, Math.floor(viewport.clientWidth * dpr));
+      const h = Math.max(1, Math.floor(viewport.clientHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+        gl.viewport(0, 0, w, h);
+      }
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    let lastTime = performance.now();
+    let zzzTimer = 0;
+
+    function render(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      const t = now * 0.001;
+
+      resizeCanvas();
+
+      if (!pointerDown) {
+        cam.yaw += camVel.yaw;
+        cam.pitch = Math.max(-0.35, Math.min(1.38, cam.pitch + camVel.pitch));
+        camVel.yaw *= Math.pow(0.06, dt);
+        camVel.pitch *= Math.pow(0.06, dt);
+      }
+
+      const acc = (pokeTarget - pokeAmp) * 165.0 - pokeVel * 9.2;
+      pokeVel += acc * dt;
+      pokeAmp += pokeVel * dt;
+
+      reactWave = Math.max(0, reactWave - dt * 1.1);
+      earBounce = Math.max(0, earBounce - dt * 1.3);
+      tempBoopTimer = Math.max(0, tempBoopTimer - dt);
+      const targetBlush = (baseExpr === 1 || tempBoopTimer > 0) ? 0.88 : 0.14;
+      blushLevel += (targetBlush - blushLevel) * Math.min(1, dt * 3.0);
+
+      if (baseExpr === 2 || currentPose === 1) {
+        zzzTimer += dt;
+        if (zzzTimer > 1.65) {
+          zzzTimer = 0;
+          const rect = viewport.getBoundingClientRect();
+          spawnFloatingEmoji(rect.left + rect.width * 0.36, rect.top + rect.height * 0.36, '💤');
+        }
+      }
+
+      const targetBones = computeTargetPose(currentPose, t, reactWave, earBounce);
+      updateSmoothedBones(targetBones, dt);
+
+      const { pos: cPos, fwd: cFwd, right: cRight, up: cUp } = getCameraBasis();
+
+      gl.uniform2f(U.uRes, canvas.width, canvas.height);
+      gl.uniform1f(U.uTime, t);
+      gl.uniform3fv(U.uCamPos, cPos);
+      gl.uniform3fv(U.uCamFwd, cFwd);
+      gl.uniform3fv(U.uCamRight, cRight);
+      gl.uniform3fv(U.uCamUp, cUp);
+
+      gl.uniform1f(U.uIsLight, isLightTheme);
+      gl.uniform1f(U.uShowMat, showMat);
+      gl.uniform1f(U.uFuzzGain, fuzzGain);
+      gl.uniform1i(U.uExpr, tempBoopTimer > 0 ? 3 : baseExpr);
+      gl.uniform1f(U.uBlush, blushLevel);
+
+      gl.uniform3fv(U.uPokePos, pokePos);
+      gl.uniform3fv(U.uPokeDir, pokeDir);
+      gl.uniform1f(U.uPokeAmp, pokeAmp);
+
+      gl.uniform3fv(U.uHeadPos,  curBones.headPos);  gl.uniformMatrix3fv(U.uHeadMat,  false, curBones.headMat);
+      gl.uniform3fv(U.uEarLPos,  curBones.earLPos);  gl.uniformMatrix3fv(U.uEarLMat,  false, curBones.earLMat);
+      gl.uniform3fv(U.uEarRPos,  curBones.earRPos);  gl.uniformMatrix3fv(U.uEarRMat,  false, curBones.earRMat);
+      gl.uniform3fv(U.uTorsoPos, curBones.torsoPos); gl.uniformMatrix3fv(U.uTorsoMat, false, curBones.torsoMat);
+      gl.uniform3fv(U.uArmLPos,  curBones.armLPos);  gl.uniformMatrix3fv(U.uArmLMat,  false, curBones.armLMat);
+      gl.uniform3fv(U.uArmRPos,  curBones.armRPos);  gl.uniformMatrix3fv(U.uArmRMat,  false, curBones.armRMat);
+      gl.uniform3fv(U.uLegLPos,  curBones.legLPos);  gl.uniformMatrix3fv(U.uLegLMat,  false, curBones.legLMat);
+      gl.uniform3fv(U.uLegRPos,  curBones.legRPos);  gl.uniformMatrix3fv(U.uLegRMat,  false, curBones.legRMat);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      const deg = (((Math.round(-cam.yaw * 180 / Math.PI) % 360) + 360) % 360);
+      statusReadout.textContent = `視角 ${deg}° · ${poseNames[currentPose]}`;
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
+  })();
+  </script>
+</body>
+</html>
