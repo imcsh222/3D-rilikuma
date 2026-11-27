@@ -482,8 +482,8 @@
           p -= uPokeDir * (0.17 * uPokeAmp * w);
           p -= radial * (0.24 * uPokeAmp * w);
         }
-        float floorCrush = 1.0 - smoothstep(-0.02, 0.11, p.y);
-        p.y += floorCrush * 0.018;
+        float floorCrush = 1.0 - smoothstep(-0.02, 0.16, p.y);
+        p.y += floorCrush * 0.034;
         return p;
       }
 
@@ -509,22 +509,23 @@
       }
 
       float dTorsoPart(vec3 t) {
-        float profile = 1.0 - 0.13 * smoothstep(-0.18, 0.58, t.y);
+        float profile = 1.0 - 0.08 * smoothstep(-0.24, 0.62, t.y);
         vec3 tp = t;
-        tp.z -= 0.03 * (1.0 - clamp(abs(t.y) / 0.55, 0.0, 1.0));
-        float dBody = sdEllipsoid(tp, vec3(0.495 * profile, 0.615, 0.445 * profile));
-        float dTail = length(t - vec3(0.0, -0.45, -0.43)) - 0.125;
-        return smin(dBody, dTail, 0.026);
+        float bellyCurve = 1.0 - clamp((t.y / 0.58) * (t.y / 0.58), 0.0, 1.0);
+        tp.z -= 0.052 * bellyCurve;
+        float dBody = sdEllipsoid(tp, vec3(0.555 * profile, 0.665, 0.515 * profile));
+        float dTail = length(t - vec3(0.0, -0.49, -0.49)) - 0.135;
+        return smin(dBody, dTail, 0.028);
       }
 
       float dArmPart(vec3 a) {
         vec3 ap = vec3(a.x, a.y, a.z * 1.18);
-        return sdCapsuleY(ap, 0.205, 0.156, 0.138);
+        return sdCapsuleY(ap, 0.132, 0.160, 0.144);
       }
 
       float dLegPart(vec3 l) {
-        float dCyl = sdCapsuleY(l, 0.225, 0.182, 0.194);
-        float dFlatSole = -(l.y + 0.365);
+        float dCyl = sdCapsuleY(l, 0.150, 0.198, 0.212);
+        float dFlatSole = -(l.y + 0.280);
         return -smin(-dCyl, -dFlatSole, 0.045);
       }
 
@@ -669,34 +670,34 @@
         }
 
         if (dAL < 0.03) {
-          float pawMask = (1.0 - smoothstep(-0.15, -0.07, aL.y)) * (1.0 - smoothstep(-0.08, -0.01, aL.x));
+          float pawMask = (1.0 - smoothstep(-0.11, -0.03, aL.y)) * (1.0 - smoothstep(-0.08, -0.01, aL.x));
           albedo = mix(albedo, colYellow, pawMask * 0.95);
         }
         if (dAR < 0.03) {
-          float pawMask = (1.0 - smoothstep(-0.15, -0.07, aR.y)) * smoothstep(0.01, 0.08, aR.x);
+          float pawMask = (1.0 - smoothstep(-0.11, -0.03, aR.y)) * smoothstep(0.01, 0.08, aR.x);
           albedo = mix(albedo, colYellow, pawMask * 0.95);
         }
-        if (dLL < 0.03 && lL.y < -0.26) {
-          float rSole = length(lL.xz / vec2(0.138, 0.150));
-          float wSole = (1.0 - smoothstep(0.92, 1.04, rSole)) * (1.0 - smoothstep(-0.32, -0.26, lL.y));
+        if (dLL < 0.03 && lL.y < -0.18) {
+          float rSole = length(lL.xz / vec2(0.150, 0.162));
+          float wSole = (1.0 - smoothstep(0.92, 1.04, rSole)) * (1.0 - smoothstep(-0.245, -0.190, lL.y));
           albedo = mix(albedo, colYellow, wSole);
         }
-        if (dLR < 0.03 && lR.y < -0.26) {
-          float rSole = length(lR.xz / vec2(0.138, 0.150));
-          float wSole = (1.0 - smoothstep(0.92, 1.04, rSole)) * (1.0 - smoothstep(-0.32, -0.26, lR.y));
+        if (dLR < 0.03 && lR.y < -0.18) {
+          float rSole = length(lR.xz / vec2(0.150, 0.162));
+          float wSole = (1.0 - smoothstep(0.92, 1.04, rSole)) * (1.0 - smoothstep(-0.245, -0.190, lR.y));
           albedo = mix(albedo, colYellow, wSole);
         }
 
         if (dT < 0.04) {
-          if (t.z > 0.12) {
-            float rBelly = length((t.xy - vec2(0.0, 0.025)) / vec2(0.365, 0.435));
-            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.12, 0.22, t.z);
-            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.12, 0.22, t.z);
+          if (t.z > 0.16) {
+            float rBelly = length((t.xy - vec2(0.0, 0.030)) / vec2(0.415, 0.475));
+            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.16, 0.27, t.z);
+            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.16, 0.27, t.z);
             albedo = mix(albedo, colWhite, wBelly);
             albedo = mix(albedo, vec3(0.76, 0.68, 0.62), bellySeam * 0.28);
             sheenCol = mix(sheenCol, vec3(1.0, 1.0, 1.0), wBelly);
           }
-          if (t.z < -0.25) {
+          if (t.z < -0.30) {
             float backLine = (1.0 - smoothstep(0.002, 0.012, abs(t.x))) * step(abs(t.y - 0.08), 0.30);
             albedo = mix(albedo, colSeam * 0.85, backLine * 0.65);
             float zipTrack = (1.0 - smoothstep(0.004, 0.014, abs(t.x))) * step(abs(t.y - 0.14), 0.16);
@@ -938,112 +939,112 @@
       let wigR = earBounce * Math.cos(t * 15.0) * 0.22;
 
       if (poseIdx === 0) {
-        headPos = [-0.88, 0.675 + breath * 0.008, 0.05];
+        headPos = [-0.88, 0.680 + breath * 0.008, 0.05];
         headMat = makeBasisXY(
           [0.34, 0.90, -0.26],
           [-0.91, 0.37 + breath * 0.015, 0.14]
         );
         wigL += Math.sin(t * 1.4) * 0.035;
 
-        torsoPos = [0.14, 0.445 + breath * 0.012, -0.01];
+        torsoPos = [0.16, 0.495 + breath * 0.014, -0.01];
         torsoMat = makeBasisYZ(
-          [-0.992, 0.11, 0.03],
-          [0.09, 0.81, 0.58]
+          [-0.994, 0.09, 0.03],
+          [0.06, 0.89, 0.45]
         );
 
         const wave = reactWave * Math.sin(t * 14.0) * 0.22;
-        armRPos = [-0.21, 0.28 + wave * 0.08, 0.39];
+        armRPos = [-0.22, 0.265 + wave * 0.07, 0.44];
         armRMat = makeBasisYZ(
-          [-0.38, 0.76 - wave * 0.3, -0.52],
+          [-0.40, 0.76 - wave * 0.3, -0.51],
           [0.20, 0.55, 0.81]
         );
 
-        armLPos = [-0.18, 0.46, -0.42];
+        armLPos = [-0.18, 0.48, -0.47];
         armLMat = makeBasisYZ(
           [-0.30, 0.52, 0.80],
           [0.10, 0.84, -0.52]
         );
 
-        legRPos = [0.92, 0.335, 0.16];
+        legRPos = [0.83, 0.345, 0.16];
         legRMat = makeBasisYZ(
           [-0.995, 0.06, -0.04],
           [0.05, 0.82, 0.57]
         );
 
-        legLPos = [0.89, 0.425 + Math.sin(t * 1.8) * 0.008, -0.17];
+        legLPos = [0.80, 0.435 + Math.sin(t * 1.8) * 0.008, -0.16];
         legLMat = makeBasisYZ(
           [-0.992, 0.09, 0.06],
           [0.08, 0.84, 0.54]
         );
 
       } else if (poseIdx === 1) {
-        headPos = [-0.90, 0.56, 0.0];
+        headPos = [-0.90, 0.57, 0.0];
         headMat = makeBasisYZ(
           [-0.99, 0.12, 0.0],
           [0.12, 0.99, 0.04 * Math.sin(t * 1.1)]
         );
 
-        torsoPos = [0.16, 0.44 + breath * 0.022, 0.0];
+        torsoPos = [0.16, 0.49 + breath * 0.024, 0.0];
         torsoMat = makeBasisYZ([-1.0, 0.02, 0.0], [0.02, 1.0, 0.0]);
 
         const flap = Math.sin(t * 1.6) * 0.04 + reactWave * Math.sin(t * 14.0) * 0.25;
-        armLPos = [-0.22, 0.30 + flap * 0.1, -0.54];
+        armLPos = [-0.20, 0.32 + flap * 0.09, -0.56];
         armLMat = makeBasisYZ([-0.35, 0.28, 0.89], [0.0, 0.95, -0.30]);
 
-        armRPos = [-0.22, 0.30 + flap * 0.1, 0.54];
+        armRPos = [-0.20, 0.32 + flap * 0.09, 0.56];
         armRMat = makeBasisYZ([-0.35, 0.28, -0.89], [0.0, 0.95, 0.30]);
 
-        legLPos = [0.92, 0.29, -0.23];
+        legLPos = [0.84, 0.31, -0.23];
         legLMat = makeBasisYZ([-0.96, 0.10, 0.24], [0.10, 0.99, 0.0]);
 
-        legRPos = [0.92, 0.29, 0.23];
+        legRPos = [0.84, 0.31, 0.23];
         legRMat = makeBasisYZ([-0.96, 0.10, -0.24], [0.10, 0.99, 0.0]);
 
       } else if (poseIdx === 2) {
         const tilt = Math.sin(t * 1.7) * 0.06;
-        headPos = [tilt * 0.25, 1.24 + breath * 0.012, 0.04];
+        headPos = [tilt * 0.25, 1.29 + breath * 0.012, 0.04];
         headMat = makeBasisXY(
           [Math.cos(tilt), Math.sin(tilt), 0.0],
           [-Math.sin(tilt), Math.cos(tilt), -0.06]
         );
 
-        torsoPos = [0.0, 0.54 + breath * 0.01, -0.02];
+        torsoPos = [0.0, 0.58 + breath * 0.012, -0.02];
         torsoMat = makeBasisYZ([0.0, 1.0, -0.05], [0.0, 0.05, 1.0]);
 
         const wave = 0.22 * Math.sin(t * 3.4) + reactWave * Math.sin(t * 14.0) * 0.42;
-        armLPos = [0.50, 0.88 + wave * 0.08, 0.14];
+        armLPos = [0.53, 0.88 + wave * 0.07, 0.14];
         armLMat = makeBasisYZ([-0.62, -0.68 + wave * 0.45, -0.22], [0.0, -0.28, 0.96]);
 
-        armRPos = [-0.51, 0.58, 0.14];
+        armRPos = [-0.54, 0.62, 0.14];
         armRMat = makeBasisYZ([0.62, 0.74, -0.24], [0.0, 0.30, 0.95]);
 
-        legLPos = [0.27, 0.20, 0.36];
+        legLPos = [0.29, 0.21, 0.38];
         legLMat = makeBasisYZ([-0.14, 0.06, -0.98], [0.0, 1.0, 0.06]);
 
-        legRPos = [-0.27, 0.20, 0.36];
+        legRPos = [-0.29, 0.21, 0.38];
         legRMat = makeBasisYZ([0.14, 0.06, -0.98], [0.0, 1.0, 0.06]);
 
       } else {
-        headPos = [-0.82, 0.64 + breath * 0.01, 0.08];
+        headPos = [-0.84, 0.65 + breath * 0.01, 0.08];
         headMat = makeBasisYZ(
           [-0.10, 0.99, -0.04],
           [-0.48, 0.02, 0.88]
         );
 
-        torsoPos = [0.16, 0.41 + breath * 0.012, -0.02];
+        torsoPos = [0.16, 0.46 + breath * 0.014, -0.02];
         torsoMat = makeBasisYZ([-0.99, 0.06, 0.08], [-0.06, -0.99, 0.08]);
 
-        armRPos = [-0.46, 0.21, 0.42];
+        armRPos = [-0.44, 0.22, 0.44];
         armRMat = makeBasisYZ([0.52, 0.42, -0.74], [0.0, 0.88, 0.46]);
 
-        armLPos = [-0.30, 0.21, -0.42];
+        armLPos = [-0.28, 0.22, -0.44];
         armLMat = makeBasisYZ([0.38, 0.42, 0.82], [0.0, 0.88, -0.46]);
 
         const kick = Math.sin(t * 4.4 + reactWave * 6.0) * 0.24;
-        legRPos = [0.90, 0.36 + Math.max(0, kick) * 0.26, 0.20];
+        legRPos = [0.83, 0.37 + Math.max(0, kick) * 0.22, 0.20];
         legRMat = makeBasisYZ([-0.88, -0.42 - kick * 0.85, -0.06], [0.42, -0.90, 0.0]);
 
-        legLPos = [0.88, 0.36 + Math.max(0, -kick) * 0.26, -0.22];
+        legLPos = [0.81, 0.37 + Math.max(0, -kick) * 0.22, -0.22];
         legLMat = makeBasisYZ([-0.88, -0.42 + kick * 0.85, 0.06], [0.42, -0.90, 0.0]);
       }
 
@@ -1137,13 +1138,13 @@
 
       const parts = [
         { id: 'head',  label: '軟綿綿饅頭臉頰', pos: curBones.headPos,  mat: curBones.headMat,  r: [0.81, 0.62, 0.58] },
-        { id: 'earL',  label: '左耳黃色軟墊', pos: curBones.earLPos, mat: curBones.earLMat, r: [0.28, 0.26, 0.15] },
-        { id: 'earR',  label: '右耳黃色軟墊', pos: curBones.earRPos, mat: curBones.earRMat, r: [0.28, 0.26, 0.15] },
-        { id: 'torso', label: '圓滾滾白肚肚', pos: curBones.torsoPos, mat: curBones.torsoMat, r: [0.50, 0.62, 0.45] },
-        { id: 'armL',  label: '小短手肉球', pos: curBones.armLPos,  mat: curBones.armLMat,  r: [0.17, 0.34, 0.16] },
-        { id: 'armR',  label: '小短手肉球', pos: curBones.armRPos,  mat: curBones.armRMat,  r: [0.17, 0.34, 0.16] },
-        { id: 'legL',  label: '短腿黃色腳掌', pos: curBones.legLPos, mat: curBones.legLMat, r: [0.20, 0.39, 0.20] },
-        { id: 'legR',  label: '短腿黃色腳掌', pos: curBones.legRPos, mat: curBones.legRMat, r: [0.20, 0.39, 0.20] }
+        { id: 'earL',  label: '左耳黃色軟墊', pos: curBones.earLPos, mat: curBones.earLMat, r: [0.25, 0.24, 0.15] },
+        { id: 'earR',  label: '右耳黃色軟墊', pos: curBones.earRPos, mat: curBones.earRMat, r: [0.25, 0.24, 0.15] },
+        { id: 'torso', label: '圓滾滾大白肚', pos: curBones.torsoPos, mat: curBones.torsoMat, r: [0.56, 0.67, 0.54] },
+        { id: 'armL',  label: '短短小手肉球', pos: curBones.armLPos,  mat: curBones.armLMat,  r: [0.17, 0.28, 0.16] },
+        { id: 'armR',  label: '短短小手肉球', pos: curBones.armRPos,  mat: curBones.armRMat,  r: [0.17, 0.28, 0.16] },
+        { id: 'legL',  label: '小短腿黃色腳掌', pos: curBones.legLPos, mat: curBones.legLMat, r: [0.21, 0.31, 0.21] },
+        { id: 'legR',  label: '小短腿黃色腳掌', pos: curBones.legRPos, mat: curBones.legRMat, r: [0.21, 0.31, 0.21] }
       ];
 
       let best = null;
