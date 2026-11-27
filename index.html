@@ -690,10 +690,10 @@
         }
 
         if (dT < 0.04) {
-          if (t.z > 0.18) {
-            float rBelly = length((t.xy - vec2(0.0, -0.128)) / vec2(0.372, 0.336));
-            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.18, 0.29, t.z);
-            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.18, 0.29, t.z);
+          if (t.z > 0.10) {
+            float rBelly = length((t.xy - vec2(0.0, -0.100)) / vec2(0.445, 0.400));
+            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.10, 0.18, t.z);
+            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.10, 0.18, t.z);
             albedo = mix(albedo, colWhite, wBelly);
             albedo = mix(albedo, vec3(0.76, 0.68, 0.62), bellySeam * 0.28);
             sheenCol = mix(sheenCol, vec3(1.0, 1.0, 1.0), wBelly);
