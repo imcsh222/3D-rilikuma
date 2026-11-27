@@ -510,8 +510,8 @@
 
       float dTorsoPart(vec3 t) {
         vec3 tp = t;
-        float bellyCurve = 1.0 - clamp((t.y / 0.58) * (t.y / 0.58), 0.0, 1.0);
-        tp.z -= 0.052 * bellyCurve;
+        float bellyCurve = 1.0 - clamp(((t.y + 0.11) / 0.52) * ((t.y + 0.11) / 0.52), 0.0, 1.0);
+        tp.z -= 0.056 * bellyCurve;
         float dBelly = sdEllipsoid(tp, vec3(0.560, 0.655, 0.520));
         float dChest = sdEllipsoid(t - vec3(0.0, 0.42, -0.01), vec3(0.485, 0.365, 0.448));
         float dBody = smin(dBelly, dChest, 0.14);
@@ -690,10 +690,10 @@
         }
 
         if (dT < 0.04) {
-          if (t.z > 0.16) {
-            float rBelly = length((t.xy - vec2(0.0, -0.035)) / vec2(0.408, 0.448));
-            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.16, 0.27, t.z);
-            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.16, 0.27, t.z);
+          if (t.z > 0.18) {
+            float rBelly = length((t.xy - vec2(0.0, -0.128)) / vec2(0.372, 0.336));
+            float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.18, 0.29, t.z);
+            float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.18, 0.29, t.z);
             albedo = mix(albedo, colWhite, wBelly);
             albedo = mix(albedo, vec3(0.76, 0.68, 0.62), bellySeam * 0.28);
             sheenCol = mix(sheenCol, vec3(1.0, 1.0, 1.0), wBelly);
