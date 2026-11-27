@@ -509,11 +509,12 @@
       }
 
       float dTorsoPart(vec3 t) {
-        float profile = 1.0 - 0.08 * smoothstep(-0.24, 0.62, t.y);
         vec3 tp = t;
         float bellyCurve = 1.0 - clamp((t.y / 0.58) * (t.y / 0.58), 0.0, 1.0);
         tp.z -= 0.052 * bellyCurve;
-        float dBody = sdEllipsoid(tp, vec3(0.555 * profile, 0.665, 0.515 * profile));
+        float dBelly = sdEllipsoid(tp, vec3(0.560, 0.655, 0.520));
+        float dChest = sdEllipsoid(t - vec3(0.0, 0.42, -0.01), vec3(0.485, 0.365, 0.448));
+        float dBody = smin(dBelly, dChest, 0.14);
         float dTail = length(t - vec3(0.0, -0.49, -0.49)) - 0.135;
         return smin(dBody, dTail, 0.028);
       }
@@ -543,8 +544,8 @@
         float dLR = dLegPart((p - uLegRPos) * uLegRMat);
 
         float dLimbs = min(min(dAL, dAR), min(dLL, dLR));
-        float dBodyAll = smin(dT, dLimbs, 0.032);
-        return smin(dHeadAll, dBodyAll, 0.038);
+        float dBodyAll = smin(dT, dLimbs, 0.028);
+        return smin(dHeadAll, dBodyAll, 0.016);
       }
 
       float sdMatCushion(vec3 p) {
@@ -690,7 +691,7 @@
 
         if (dT < 0.04) {
           if (t.z > 0.16) {
-            float rBelly = length((t.xy - vec2(0.0, 0.030)) / vec2(0.415, 0.475));
+            float rBelly = length((t.xy - vec2(0.0, -0.035)) / vec2(0.408, 0.448));
             float wBelly = (1.0 - smoothstep(0.96, 1.02, rBelly)) * smoothstep(0.16, 0.27, t.z);
             float bellySeam = (1.0 - smoothstep(0.0, 0.055, abs(rBelly - 0.99))) * smoothstep(0.16, 0.27, t.z);
             albedo = mix(albedo, colWhite, wBelly);
@@ -939,46 +940,46 @@
       let wigR = earBounce * Math.cos(t * 15.0) * 0.22;
 
       if (poseIdx === 0) {
-        headPos = [-0.88, 0.680 + breath * 0.008, 0.05];
+        headPos = [-0.79, 0.655 + breath * 0.008, 0.04];
         headMat = makeBasisXY(
           [0.34, 0.90, -0.26],
           [-0.91, 0.37 + breath * 0.015, 0.14]
         );
         wigL += Math.sin(t * 1.4) * 0.035;
 
-        torsoPos = [0.16, 0.495 + breath * 0.014, -0.01];
+        torsoPos = [0.15, 0.495 + breath * 0.014, -0.01];
         torsoMat = makeBasisYZ(
-          [-0.994, 0.09, 0.03],
+          [-0.994, 0.08, 0.03],
           [0.06, 0.89, 0.45]
         );
 
         const wave = reactWave * Math.sin(t * 14.0) * 0.22;
-        armRPos = [-0.22, 0.265 + wave * 0.07, 0.44];
+        armRPos = [-0.24, 0.260 + wave * 0.07, 0.44];
         armRMat = makeBasisYZ(
           [-0.40, 0.76 - wave * 0.3, -0.51],
           [0.20, 0.55, 0.81]
         );
 
-        armLPos = [-0.18, 0.48, -0.47];
+        armLPos = [-0.19, 0.48, -0.47];
         armLMat = makeBasisYZ(
           [-0.30, 0.52, 0.80],
           [0.10, 0.84, -0.52]
         );
 
-        legRPos = [0.83, 0.345, 0.16];
+        legRPos = [0.82, 0.345, 0.16];
         legRMat = makeBasisYZ(
           [-0.995, 0.06, -0.04],
           [0.05, 0.82, 0.57]
         );
 
-        legLPos = [0.80, 0.435 + Math.sin(t * 1.8) * 0.008, -0.16];
+        legLPos = [0.79, 0.435 + Math.sin(t * 1.8) * 0.008, -0.16];
         legLMat = makeBasisYZ(
           [-0.992, 0.09, 0.06],
           [0.08, 0.84, 0.54]
         );
 
       } else if (poseIdx === 1) {
-        headPos = [-0.90, 0.57, 0.0];
+        headPos = [-0.79, 0.565, 0.0];
         headMat = makeBasisYZ(
           [-0.99, 0.12, 0.0],
           [0.12, 0.99, 0.04 * Math.sin(t * 1.1)]
@@ -1002,20 +1003,20 @@
 
       } else if (poseIdx === 2) {
         const tilt = Math.sin(t * 1.7) * 0.06;
-        headPos = [tilt * 0.25, 1.29 + breath * 0.012, 0.04];
+        headPos = [tilt * 0.25, 1.19 + breath * 0.012, 0.03];
         headMat = makeBasisXY(
           [Math.cos(tilt), Math.sin(tilt), 0.0],
           [-Math.sin(tilt), Math.cos(tilt), -0.06]
         );
 
-        torsoPos = [0.0, 0.58 + breath * 0.012, -0.02];
+        torsoPos = [0.0, 0.56 + breath * 0.012, -0.02];
         torsoMat = makeBasisYZ([0.0, 1.0, -0.05], [0.0, 0.05, 1.0]);
 
         const wave = 0.22 * Math.sin(t * 3.4) + reactWave * Math.sin(t * 14.0) * 0.42;
-        armLPos = [0.53, 0.88 + wave * 0.07, 0.14];
+        armLPos = [0.53, 0.85 + wave * 0.07, 0.14];
         armLMat = makeBasisYZ([-0.62, -0.68 + wave * 0.45, -0.22], [0.0, -0.28, 0.96]);
 
-        armRPos = [-0.54, 0.62, 0.14];
+        armRPos = [-0.54, 0.60, 0.14];
         armRMat = makeBasisYZ([0.62, 0.74, -0.24], [0.0, 0.30, 0.95]);
 
         legLPos = [0.29, 0.21, 0.38];
@@ -1025,7 +1026,7 @@
         legRMat = makeBasisYZ([0.14, 0.06, -0.98], [0.0, 1.0, 0.06]);
 
       } else {
-        headPos = [-0.84, 0.65 + breath * 0.01, 0.08];
+        headPos = [-0.76, 0.63 + breath * 0.01, 0.06];
         headMat = makeBasisYZ(
           [-0.10, 0.99, -0.04],
           [-0.48, 0.02, 0.88]
